@@ -1,0 +1,55 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby sw=2 st=2 et :
+
+# Maintainer : Amadou Diallo ""
+
+# Use debian buster for our servers
+Vagrant.configure("2") do |config|
+  config.vm.box = "debian/buster64"
+  config.vm.box_check_update = false
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "800"
+    vb.gui = false
+    vb.cpus = 2
+    vb.customize ["modifyvm", :id, "--cpuexecutioncap", "50"]
+  end
+
+
+  # Create our servers (0 to 4)
+  5.times do |idx|
+    config.vm.define "s#{idx}.infra" do |machine|
+      machine.vm.hostname = "s#{idx}.infra"
+      # machine.vm.synced_folder ".", "/vagrant", disabled: true
+      # machine.vm.synced_folder ".", "/vagrant", type: "rsync", rsync__exclude: ['.*', 'part1_rsa','Vagrantfile','provision/']
+      if idx == 0
+        machine.vm.network "private_network", ip: "192.168.50.#{idx * 10 + 10}"
+        machine.vm.network "forwarded_port", guest: 80, host: 80
+        machine.vm.network "forwarded_port", guest: 8080, host: 8080
+      else
+        #machine.vm.network "private_network", bridge: "eth0", ip: "192.168.50.#{idx * 10 + 10}"
+        machine.vm.network "private_network", ip: "192.168.50.#{idx * 10 + 10}"#, auto_config: false
+      end
+
+      machine.vm.provision "shell", path: "provision/shell/provision.sh"
+    end
+    # provision/shell/control.sh
+    # provision/shell/serverX.sh
+  end
+
+  config.vm.define 'control' do |machine|
+    machine.vm.hostname = 'control'
+    # machine.vm.synced_folder ".", "/vagrant", type: "rsync", rsync__exclude: ['.*']
+    machine.vm.network "private_network", bridge: "eth0", ip: "192.168.50.200"
+
+    machine.vm.provision "shell", path: "provision/shell/provision.sh"
+    machine.vm.provision "shell", path: "provision/ansible/add_know_hosts.sh"
+    #machine.vm.provision "shell", path: "provision/ansible/test_install_tmux.sh"
+    machine.vm.provision "shell", path: "provision/ansible/provision_all.sh"
+
+  end
+
+  #config.vm.provision "shell", path: "provision/ansible/provision_all.sh"
+end
+
+
